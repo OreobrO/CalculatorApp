@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+//TODO: 연산 시 기존의 값을 저장하지 못하는 상태입니다!!
 enum CalcButton: String {
     case one = "1"
     case two = "2"
@@ -58,7 +59,7 @@ enum Operation {
 
 struct ContentView: View {
     
-    @State var value = "0"
+    @State var value = ""
     @State var runningNumber = 0
     @State var currentOperation: Operation = .none
     
@@ -91,8 +92,10 @@ struct ContentView: View {
                             .font(.system(size: 48, weight: .light))
                             .foregroundColor(.black)
                     }//Result
+                    .frame(height: 100)
                     .padding(.horizontal, 24)
                 }
+                .padding(.bottom, 16)
                 // Our buttons
                 ForEach(buttons, id: \.self) { row in
                     HStack(spacing: 12) {
@@ -151,15 +154,15 @@ struct ContentView: View {
                 }
             }
             if button != .equal {
-                self.value = "0"
+                self.value = ""
             }
         case .clear:
-            self.value = "0"
+            self.value = ""
         case .decimal, .negative, .percent:
             break
         default:
             let number = button.rawValue
-            if self.value == "0" {
+            if self.value == "" {
                 value = number
             }
             else {
