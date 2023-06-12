@@ -20,15 +20,15 @@ enum CalcButton: String {
     case nine = "9"
     case zero = "0"
     case doubleZero = "00"
-    case add = "+"
-    case subtract = "-"
-    case divide = "/"
-    case multiply = "x"
-    case equal = "="
-    case clear = "C"
+    case add = "plus"
+    case subtract = "minus"
+    case divide = "divide"
+    case multiply = "multiply"
+    case equal = "equal"
+    case clear = "AC"
     case decimal = "."
-    case percent = "%"
-    case negative = "-/+"
+    case percent = "percent"
+    case negative = "plus.forwardslash.minus"
     
     var buttonColor: Color {
         switch self {
@@ -83,10 +83,11 @@ struct ContentView: View {
                         .foregroundColor(.gray2)
                     
                     HStack {
-                        Text("w")
-                            .font(.system(size: 32, weight: .light))
+                        Image(systemName: "wonsign")
+                            .font(.title2)
+                            .fontWeight(.bold)
                             .foregroundColor(.black)
-                            .opacity(0.5)
+                            .opacity(0.3)
                         Spacer()
                         Text(value)
                             .font(.system(size: 48, weight: .light))
@@ -103,16 +104,28 @@ struct ContentView: View {
                             Button(action: {
                                 self.didTap(button: item)
                             }, label: {
-                                Text(item.rawValue)
-                                    .font(.system(size: 32))
-                                    .frame(
-                                        width: self.buttonWidth(item: item),
-                                        height: max(48, self.buttonHeight())
-                                    )
-                                    .background(item.buttonColor)
-                                    .foregroundColor(item.fontColor)
-                                    .cornerRadius(max(48, self.buttonHeight())/2)
-                            })
+                                if [.add, .subtract, .divide, .multiply, .equal, .percent, .negative].contains(item) {
+                                    Image(systemName: item.rawValue)
+                                        .font(.system(size: 24))
+                                        .frame(
+                                            width: self.buttonWidth(item: item),
+                                            height: max(48, self.buttonHeight())
+                                        )
+                                        .background(item.buttonColor)
+                                        .foregroundColor(item.fontColor)
+                                        .cornerRadius(max(48, self.buttonHeight())/2)
+                                } else {
+                                    Text(item.rawValue)
+                                        .font(.system(size: item == .clear ? 24: 32))
+                                        .frame(
+                                            width: self.buttonWidth(item: item),
+                                            height: max(48, self.buttonHeight())
+                                        )
+                                        .background(item.buttonColor)
+                                        .foregroundColor(item.fontColor)
+                                        .cornerRadius(max(48, self.buttonHeight())/2)
+                                }
+                                })
                         }//ForEach item
                     }//HStack
                 }//ForEach row
@@ -128,18 +141,22 @@ struct ContentView: View {
             if button == .add {
                 self.currentOperation = .add
                 self.runningNumber = Int(self.value) ?? 0
+                self.value = ""
             }
             else if button == .subtract {
                 self.currentOperation = .subtract
                 self.runningNumber = Int(self.value) ?? 0
+                self.value = ""
             }
             else if button == .multiply {
                 self.currentOperation = .multiply
                 self.runningNumber = Int(self.value) ?? 0
+                self.value = ""
             }
             else if button == .divide {
                 self.currentOperation = .divide
                 self.runningNumber = Int(self.value) ?? 0
+                self.value = ""
             }
             else if button == .equal {
                 let runningValue = self.runningNumber
@@ -153,9 +170,6 @@ struct ContentView: View {
                     break
                 }
             }
-            if button != .equal {
-                self.value = ""
-            }
         case .clear:
             self.value = ""
         case .decimal, .negative, .percent:
@@ -168,6 +182,14 @@ struct ContentView: View {
             else {
                 self.value = "\(self.value)\(number)"
             }
+        }
+    }
+    
+    func evaluateExpression(_ expression: String) -> Double? {
+        if let result = NSExpression(format: expression).expressionValue(with: nil, context: nil) as? Double {
+            return result
+        } else {
+            return nil
         }
     }
     
