@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-//TODO: 연산 시 기존의 값을 저장하지 못하는 상태입니다!!
 enum CalcButton: String {
     case one = "1"
     case two = "2"
@@ -59,9 +58,11 @@ enum Operation {
 
 struct ContentView: View {
     
+    @State var isCalculationStarted: Bool = false
+    @State var view = ""
     @State var value = ""
-    @State var runningNumber = 0
-    @State var currentOperation: Operation = .none
+    @State var plusMinus = ""
+    @State var multiplyDivide = ""
     
     let buttons: [[CalcButton]] = [
         [.clear, .negative, .percent, .divide],
@@ -89,10 +90,12 @@ struct ContentView: View {
                             .foregroundColor(.black)
                             .opacity(0.3)
                         Spacer()
-                        Text(value)
-                            .font(.system(size: 48, weight: .light))
-                            .foregroundColor(.black)
-                    }//Result
+                        VStack {
+                            Text((Double(view) ?? 0.0).truncatingRemainder(dividingBy: 1.0) == 0 ? String(Int(Double(view) ?? 0.0)) : view)
+                                .font(.system(size: 48, weight: .light))
+                                .foregroundColor(.black)
+                        }
+                    }//HStack
                     .frame(height: 100)
                     .padding(.horizontal, 24)
                 }
@@ -125,7 +128,7 @@ struct ContentView: View {
                                         .foregroundColor(item.fontColor)
                                         .cornerRadius(max(48, self.buttonHeight())/2)
                                 }
-                                })
+                            })
                         }//ForEach item
                     }//HStack
                 }//ForEach row
@@ -139,48 +142,66 @@ struct ContentView: View {
         switch button {
         case .add, .subtract, .multiply, .divide, .equal:
             if button == .add {
-                self.currentOperation = .add
-                self.runningNumber = Int(self.value) ?? 0
+                self.isCalculationStarted = true
+                self.value = String(Double(self.view)!)
+                self.view = String(evaluateExpression(plusMinus + multiplyDivide + value)!)
+                self.value = String(Double(self.view)!)
+                self.plusMinus += self.value + "+"
+                self.multiplyDivide = ""
                 self.value = ""
             }
             else if button == .subtract {
-                self.currentOperation = .subtract
-                self.runningNumber = Int(self.value) ?? 0
+                self.isCalculationStarted = true
+                self.value = String(Double(self.view)!)
+                self.view = String(evaluateExpression(plusMinus + multiplyDivide + value)!)
+                self.value = String(Double(self.view)!)
+                self.plusMinus += self.value + "-"
+                self.multiplyDivide = ""
                 self.value = ""
             }
             else if button == .multiply {
-                self.currentOperation = .multiply
-                self.runningNumber = Int(self.value) ?? 0
+                self.isCalculationStarted = true
+                self.value = String(Double(self.view)!)
+                self.view = String(evaluateExpression(multiplyDivide + value)!)
+                self.multiplyDivide += self.value + "*"
                 self.value = ""
             }
             else if button == .divide {
-                self.currentOperation = .divide
-                self.runningNumber = Int(self.value) ?? 0
+                self.isCalculationStarted = true
+                self.value = String(Double(self.view)!)
+                self.view = String(evaluateExpression(multiplyDivide + value)!)
+                self.multiplyDivide += self.value + "/"
                 self.value = ""
             }
             else if button == .equal {
-                let runningValue = self.runningNumber
-                let currentValue = Int(self.value) ?? 0
-                switch self.currentOperation {
-                case .add: self.value = "\(runningValue + currentValue)"
-                case .subtract: self.value = "\(runningValue - currentValue)"
-                case .multiply: self.value = "\(runningValue * currentValue)"
-                case .divide: self.value = "\(runningValue / currentValue)"
-                case .none:
-                    break
-                }
+                self.isCalculationStarted = true
+                self.value = String(Double(self.view)!)
+                self.view = String(evaluateExpression(plusMinus + multiplyDivide + value)!)
+                self.plusMinus = ""
+                self.multiplyDivide = ""
+                self.value = ""
             }
         case .clear:
+            self.isCalculationStarted = false
+            self.view = ""
             self.value = ""
-        case .decimal, .negative, .percent:
+            self.plusMinus = ""
+            self.multiplyDivide = ""
+        case .decimal:
+            if !view.contains(".") {
+                self.view += "."
+            } else {
+                break
+            }
+        case .negative, .percent:
             break
         default:
             let number = button.rawValue
-            if self.value == "" {
-                value = number
-            }
-            else {
-                self.value = "\(self.value)\(number)"
+            if !isCalculationStarted {
+                self.view += number
+            } else {
+                self.view = number
+                isCalculationStarted = false
             }
         }
     }
