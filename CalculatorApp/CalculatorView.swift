@@ -11,6 +11,9 @@ import UIKit
 struct CalculatorView: View {
     @State private var inputSequence: String = ""  // 사용자가 누른 버튼들의 순서
     @State private var calculationResult: Double? = nil  // 계산 결과
+    @State private var fromCurrency: Currency? = Currency.usd // 입력 화폐
+    @State private var toCurrency: Currency? = Currency.krw // 변환 화폐
+    @State private var currencyComparison: Double? = 1400 //환율
     
     let buttons: [[CalcButton]] = [
         [.clear, .negative, .backspace, .divide],
@@ -20,6 +23,11 @@ struct CalculatorView: View {
         [.zero, .doubleZero, .decimal, .equal]
     ]
     
+    func playHapticFeedback() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
+    
     var body: some View {
         ZStack {
             Color.gray1.edgesIgnoringSafeArea(.all)
@@ -27,39 +35,59 @@ struct CalculatorView: View {
             VStack {
                 Spacer()
                 //Text display
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .frame(height: 100)
-                        .foregroundColor(.gray2)
-                    
-                    HStack {
-                        Image(systemName: "wonsign")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.black)
-                            .opacity(0.3)
-                        Spacer()
-                        VStack {
-                            if let result = calculationResult {
-                                Text(formatResult(result))
-                                    .font(.system(size: 48, weight: .light))
-                                    .foregroundColor(.black)
-                            } else {
-                                Text(inputSequence.isEmpty ? "0" : inputSequence)
-                                    .font(.system(size: 48, weight: .light))
-                                    .foregroundColor(.black)
+                    VStack {
+                        HStack {
+                            Text(toCurrency!.rawValue)
+                            Spacer()
+                            VStack {
+                                if let result = calculationResult {
+                                    Text(formatResult(result * currencyComparison!))
+                                }
                             }
+                            .lineLimit(1)
+                        }//HStack
+                        .font(.title3)
+                        .fontWeight(.light)
+                        .foregroundColor(.black.opacity(0.3))
+                        .padding(.horizontal, 12)
+                        .background{
+                            RoundedRectangle(cornerRadius: 20)
+                                .foregroundColor(.white.opacity(0.5))
                         }
-                    }//HStack
-                    .frame(height: 100)
-                    .padding(.horizontal, 24)
-                }
-                .padding(.bottom, 16)
+                        .padding(.horizontal, 12)
+                        
+                        HStack {
+                            Text(fromCurrency!.rawValue)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.black)
+                                .opacity(0.3)
+                            Spacer()
+                            VStack {
+                                if let result = calculationResult {
+                                    Text(formatResult(result))
+                                } else {
+                                    Text(inputSequence.isEmpty ? "0" : inputSequence)
+                                }
+                            }
+                                .font(.system(size: 48, weight: .light))
+                                .foregroundColor(.black)
+                                .lineLimit(1)
+                        }//HStack
+                        .padding(.horizontal, 24)
+                    }
+                    .padding(.vertical, 16)
+                    .background{
+                        RoundedRectangle(cornerRadius: 20)
+                            .foregroundColor(.gray2)
+                    }
+    
                 // Our buttons
                 ForEach(buttons, id: \.self) { row in
                     HStack(spacing: 12) {
                         ForEach(row, id: \.self) { item in
                             Button(action: {
+                                playHapticFeedback()
                                 handleButtonPress(item)
                             }, label: {
                                 if [.add, .subtract, .multiply, .divide, .equal, .backspace, .negative].contains(item) {
@@ -94,6 +122,7 @@ struct CalculatorView: View {
                                         .cornerRadius(max(48, self.buttonHeight())/2)
                                 }
                             })
+                            .buttonStyle(PlainButtonStyle())
                         }//ForEach item
                     }//HStack
                 }//ForEach row
@@ -334,4 +363,8 @@ struct CalculatorView: View {
     func buttonHeight() -> CGFloat {
         return (UIScreen.main.bounds.height * 0.37 - (6*12)) / 5
     }
+}
+
+#Preview {
+    CalculatorView()
 }
