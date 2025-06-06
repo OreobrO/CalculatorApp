@@ -50,28 +50,35 @@ enum CalcButton: String {
             return .black
         }
     }
-}
-
-enum Operation {
-    case add, subtract, multiply, divide, none
+    
+    var displayValue: String {
+        switch self {
+        case .multiply: return "×"
+        case .divide: return "÷"
+        case .add: return "+"
+        case .subtract: return "-"
+        case .equal: return "="
+        case .clear: return "AC"
+        case .negative: return "±"
+        case .percent: return "%"
+        case .decimal: return "."
+        default: return self.rawValue
+        }
+    }
 }
 
 struct ContentView: View {
-    
-    @State var isCalculationStarted: Bool = false
-    @State var view = ""
-    @State var value = ""
-    @State var plusMinus = ""
-    @State var multiplyDivide = ""
-    @State var errorMessage: String? = nil
+    @State private var inputSequence: String = ""  // 사용자가 누른 버튼들의 순서
+    @State private var calculationResult: Double? = nil  // 계산 결과
     
     let buttons: [[CalcButton]] = [
         [.clear, .negative, .percent, .divide],
         [.seven, .eight, .nine, .multiply],
         [.four, .five, .six, .subtract],
         [.one, .two, .three, .add],
-        [.zero, .doubleZero, .decimal, .equal],
+        [.zero, .doubleZero, .decimal, .equal]
     ]
+    
     var body: some View {
         ZStack {
             Color.gray1.edgesIgnoringSafeArea(.all)
@@ -92,12 +99,12 @@ struct ContentView: View {
                             .opacity(0.3)
                         Spacer()
                         VStack {
-                            if let error = errorMessage {
-                                Text(error)
-                                    .font(.system(size: 24, weight: .light))
-                                    .foregroundColor(.red)
+                            if let result = calculationResult {
+                                Text(formatResult(result))
+                                    .font(.system(size: 48, weight: .light))
+                                    .foregroundColor(.black)
                             } else {
-                                Text((Double(view) ?? 0.0).truncatingRemainder(dividingBy: 1.0) == 0 ? String(Int(Double(view) ?? 0.0)) : view)
+                                Text(inputSequence.isEmpty ? "0" : inputSequence)
                                     .font(.system(size: 48, weight: .light))
                                     .foregroundColor(.black)
                             }
@@ -112,7 +119,7 @@ struct ContentView: View {
                     HStack(spacing: 12) {
                         ForEach(row, id: \.self) { item in
                             Button(action: {
-                                self.didTap(button: item)
+                                handleButtonPress(item)
                             }, label: {
                                 if [.add, .subtract, .multiply, .divide, .equal, .percent, .negative].contains(item) {
                                     Image(systemName: item.rawValue)
@@ -145,116 +152,96 @@ struct ContentView: View {
         }
     }
     
-    func didTap(button: CalcButton) {
-        if errorMessage != nil && button != .clear {
-            return
-        }
-        
-        switch button {
-        case .add, .subtract, .multiply, .divide, .equal:
-            if button == .add {
-                self.isCalculationStarted = true
-                self.value = String(Double(self.view)!)
-                if let result = evaluateExpression(plusMinus + multiplyDivide + value) {
-                    self.view = String(result)
-                    self.value = String(result)
-                    self.plusMinus += self.value + "+"
-                    self.multiplyDivide = ""
-                    self.value = ""
-                }
+    func handleButtonPress(_ button: CalcButton) {
+        // 계산 결과가 있을 때
+        if calculationResult != nil {
+            switch button {
+            case .add, .subtract, .multiply, .divide:
+                // 연산자를 누르면 결과값 + 연산자를 inputSequence에 설정
+                inputSequence = formatResult(calculationResult!) + button.displayValue
+                calculationResult = nil
+            case .zero, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .doubleZero, .decimal:
+                // 숫자를 누르면 새로운 입력 시작
+                inputSequence = ""
+                calculationResult = nil
+                // 새로운 숫자 입력
+                inputSequence += button.displayValue
+            case .clear:
+                inputSequence = ""
+                calculationResult = nil
+            case .equal, .percent, .negative:
+                // 특수 기능은 무시
+                break
             }
-            else if button == .subtract {
-                self.isCalculationStarted = true
-                self.value = String(Double(self.view)!)
-                if let result = evaluateExpression(plusMinus + multiplyDivide + value) {
-                    self.view = String(result)
-                    self.value = String(result)
-                    self.plusMinus += self.value + "-"
-                    self.multiplyDivide = ""
-                    self.value = ""
-                }
-            }
-            else if button == .multiply {
-                self.isCalculationStarted = true
-                self.value = String(Double(self.view)!)
-                if let result = evaluateExpression(multiplyDivide + value) {
-                    self.view = String(result)
-                    self.multiplyDivide += self.value + "*"
-                    self.value = ""
-                }
-            }
-            else if button == .divide {
-                self.isCalculationStarted = true
-                self.value = String(Double(self.view)!)
-                if let result = evaluateExpression(multiplyDivide + value) {
-                    self.view = String(result)
-                    self.multiplyDivide += self.value + "/"
-                    self.value = ""
-                }
-            }
-            else if button == .equal {
-                self.isCalculationStarted = true
-                self.value = String(Double(self.view)!)
-                if let result = evaluateExpression(plusMinus + multiplyDivide + value) {
-                    self.view = String(result)
-                    self.plusMinus = ""
-                    self.multiplyDivide = ""
-                    self.value = ""
-                }
-            }
-        case .clear:
-            self.isCalculationStarted = false
-            self.view = ""
-            self.value = ""
-            self.plusMinus = ""
-            self.multiplyDivide = ""
-            self.errorMessage = nil
-        case .decimal:
-            if !view.contains(".") {
-                self.view += "."
-            }
-        case .negative:
-            if let value = Double(view) {
-                self.view = String(-value)
-            }
-        case .percent:
-            if let value = Double(view) {
-                self.view = String(value / 100)
-            }
-        default:
-            let number = button.rawValue
-            if !isCalculationStarted {
-                self.view += number
-            } else {
-                self.view = number
-                isCalculationStarted = false
+        } else {
+            // 계산 결과가 없을 때는 기존 로직대로 처리
+            switch button {
+            case .zero, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine:
+                inputSequence += button.displayValue
+            case .doubleZero:
+                inputSequence += "00"
+            case .add:
+                inputSequence += "+"
+            case .subtract:
+                inputSequence += "-"
+            case .multiply:
+                inputSequence += "×"
+            case .divide:
+                inputSequence += "÷"
+            case .decimal:
+                inputSequence += "."
+            case .clear:
+                resetCalculator()
+            case .equal:
+                calculateResult()
+            case .negative, .percent:
+                // 특수 기능은 나중에 구현
+                break
             }
         }
     }
     
-    func evaluateExpression(_ expression: String) -> Double? {
-        if expression.contains("/0") {
-            errorMessage = "0으로 나눌 수 없습니다"
-            return nil
-        }
+    func resetCalculator() {
+        inputSequence = ""
+        calculationResult = nil
+    }
+    
+    func calculateResult() {
+        // 입력이 비어있으면 계산하지 않음
+        guard !inputSequence.isEmpty else { return }
         
-        if expression.isEmpty {
-            return 0
-        }
+        // ×를 *로, ÷를 /로 변환
+        var expression = inputSequence
+            .replacingOccurrences(of: "×", with: "*")
+            .replacingOccurrences(of: "÷", with: "/")
         
         do {
+            // NSExpression을 사용하여 수식 계산
             let result = try NSExpression(format: expression).expressionValue(with: nil, context: nil) as? Double
             
-            if let result = result, abs(result) > Double.greatestFiniteMagnitude {
-                errorMessage = "계산 결과가 너무 큽니다"
-                return nil
+            // 결과가 너무 큰 경우 처리
+            if let result = result {
+                if abs(result) > Double.greatestFiniteMagnitude {
+                    calculationResult = nil
+                    inputSequence = "Error: Too large"
+                    return
+                }
+                calculationResult = result
             }
-            
-            return result
         } catch {
-            errorMessage = "계산 오류가 발생했습니다"
-            return nil
+            // 계산 오류 처리
+            calculationResult = nil
+            inputSequence = "Error"
         }
+    }
+    
+    func formatResult(_ number: Double) -> String {
+        // 소수점 이하가 0인 경우 정수로 표시
+        if number.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(Int(number))
+        }
+        // 소수점이 있는 경우 소수점 둘째 자리까지 표시
+        return String(format: "%.2f", number)
     }
     
     func buttonWidth(item: CalcButton) -> CGFloat {
@@ -264,11 +251,8 @@ struct ContentView: View {
     func buttonHeight() -> CGFloat {
         return (UIScreen.main.bounds.height * 0.37 - (6*12)) / 5
     }
-    
 }
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-    }
+#Preview {
+    ContentView()
 }
