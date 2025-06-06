@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum CalcButton: String {
+enum CalcButton: String, CaseIterable {
     case one = "1"
     case two = "2"
     case three = "3"
@@ -26,14 +26,16 @@ enum CalcButton: String {
     case equal = "equal"
     case clear = "AC"
     case decimal = "."
-    case percent = "percent"
+    case backspace = "delete.backward"
     case negative = "plus.forwardslash.minus"
+    
+    static let operators = ["+", "-", "×", "÷"]
     
     var buttonColor: Color {
         switch self {
         case .add, .subtract, .multiply, .divide, .equal:
             return .main
-        case .clear, .negative, .percent:
+        case .clear, .negative, .backspace:
             return .gray3
         default:
             return .gray2
@@ -44,7 +46,7 @@ enum CalcButton: String {
         switch self {
         case .add, .subtract, .multiply, .divide, .equal:
             return .white
-        case .clear, .negative, .percent:
+        case .clear, .negative, .backspace:
             return .black
         default:
             return .black
@@ -60,10 +62,38 @@ enum CalcButton: String {
         case .equal: return "="
         case .clear: return "AC"
         case .negative: return "±"
-        case .percent: return "%"
+        case .backspace: return "􁂈"
         case .decimal: return "."
         default: return self.rawValue
         }
+    }
+    
+    var isOperator: Bool {
+        return Self.operators.contains(self.displayValue)
+    }
+    
+    var isNegativeOperator: Bool {
+        return self.displayValue == "-"
+    }
+    
+    var isMultiplyOrDivide: Bool {
+        return self.displayValue == "×" || self.displayValue == "÷"
+    }
+    
+    var toggledOperator: String {
+        switch self.displayValue {
+        case "×": return "×-"
+        case "×-": return "×"
+        case "÷": return "÷-"
+        case "÷-": return "÷"
+        case "+": return "-"
+        case "-": return "+"
+        default: return self.displayValue
+        }
+    }
+    
+    static func getOperatorButton(for displayValue: String) -> CalcButton? {
+        return allCases.first { $0.displayValue == displayValue }
     }
 }
 
@@ -72,7 +102,7 @@ struct ContentView: View {
     @State private var calculationResult: Double? = nil  // 계산 결과
     
     let buttons: [[CalcButton]] = [
-        [.clear, .negative, .percent, .divide],
+        [.clear, .negative, .backspace, .divide],
         [.seven, .eight, .nine, .multiply],
         [.four, .five, .six, .subtract],
         [.one, .two, .three, .add],
@@ -121,8 +151,18 @@ struct ContentView: View {
                             Button(action: {
                                 handleButtonPress(item)
                             }, label: {
-                                if [.add, .subtract, .multiply, .divide, .equal, .percent, .negative].contains(item) {
+                                if [.add, .subtract, .multiply, .divide, .equal, .backspace, .negative].contains(item) {
                                     Image(systemName: item.rawValue)
+                                        .font(.system(size: 24))
+                                        .frame(
+                                            width: self.buttonWidth(item: item),
+                                            height: max(48, self.buttonHeight())
+                                        )
+                                        .background(item.buttonColor)
+                                        .foregroundColor(item.fontColor)
+                                        .cornerRadius(max(48, self.buttonHeight())/2)
+                                } else if item == .clear {
+                                    Text("AC")
                                         .font(.system(size: 24))
                                         .frame(
                                             width: self.buttonWidth(item: item),
@@ -133,7 +173,7 @@ struct ContentView: View {
                                         .cornerRadius(max(48, self.buttonHeight())/2)
                                 } else {
                                     Text(item.rawValue)
-                                        .font(.system(size: item == .clear ? 24: 32))
+                                        .font(.system(size: 32))
                                         .frame(
                                             width: self.buttonWidth(item: item),
                                             height: max(48, self.buttonHeight())
@@ -156,11 +196,11 @@ struct ContentView: View {
         // 계산 결과가 있을 때
         if calculationResult != nil {
             switch button {
-            case .add, .subtract, .multiply, .divide:
+            case .add, .subtract, .multiply, .divide, .decimal:
                 // 연산자를 누르면 결과값 + 연산자를 inputSequence에 설정
                 inputSequence = formatResult(calculationResult!) + button.displayValue
                 calculationResult = nil
-            case .zero, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .doubleZero, .decimal:
+            case .zero, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .doubleZero:
                 // 숫자를 누르면 새로운 입력 시작
                 inputSequence = ""
                 calculationResult = nil
@@ -169,7 +209,7 @@ struct ContentView: View {
             case .clear:
                 inputSequence = ""
                 calculationResult = nil
-            case .equal, .percent, .negative:
+            case .equal, .backspace, .negative:
                 // 특수 기능은 무시
                 break
             }
@@ -180,23 +220,130 @@ struct ContentView: View {
                 inputSequence += button.displayValue
             case .doubleZero:
                 inputSequence += "00"
-            case .add:
-                inputSequence += "+"
-            case .subtract:
-                inputSequence += "-"
-            case .multiply:
-                inputSequence += "×"
-            case .divide:
-                inputSequence += "÷"
+            case .add, .subtract, .multiply, .divide:
+                if inputSequence.isEmpty {
+                    if button == .subtract {
+                        inputSequence = "-"
+                    }
+                    return
+                }
+                
+                // 마지막 연산자와 그 이전 문자 확인
+                if let lastChar = inputSequence.last {
+                    let lastCharStr = String(lastChar)
+                    
+                    // ×- 또는 ÷-로 끝나는 경우
+                    if lastCharStr == "-" && inputSequence.count >= 2 {
+                        let secondLastChar = inputSequence[inputSequence.index(inputSequence.endIndex, offsetBy: -2)]
+                        let secondLastCharStr = String(secondLastChar)
+                        
+                        if secondLastCharStr == "×" || secondLastCharStr == "÷" {
+                            switch button {
+                            case .add:
+                                // ×- 또는 ÷-를 +로 변경
+                                inputSequence.removeLast(2)
+                                inputSequence += "+"
+                            case .subtract:
+                                // ×- 또는 ÷- 유지
+                                return
+                            case .multiply:
+                                // ×- 또는 ÷-를 ×로 변경
+                                inputSequence.removeLast(2)
+                                inputSequence += "×"
+                            case .divide:
+                                // ×- 또는 ÷-를 ÷로 변경
+                                inputSequence.removeLast(2)
+                                inputSequence += "÷"
+                            default:
+                                break
+                            }
+                            return
+                        }
+                    }
+                    
+                    // 일반적인 연산자 처리
+                    if ["+", "-", "×", "÷"].contains(lastCharStr) {
+                        // × 또는 ÷ 뒤에 -가 오는 경우
+                        if button == .subtract && (lastCharStr == "×" || lastCharStr == "÷") {
+                            inputSequence += "-"
+                            return
+                        }
+                        
+                        // 마지막 연산자를 새로운 연산자로 교체
+                        inputSequence.removeLast()
+                    }
+                }
+                inputSequence += button.displayValue
+                
             case .decimal:
                 inputSequence += "."
             case .clear:
-                resetCalculator()
+                inputSequence = ""
+                calculationResult = nil
             case .equal:
                 calculateResult()
-            case .negative, .percent:
-                // 특수 기능은 나중에 구현
-                break
+                inputSequence = ""
+            case .negative:
+                if inputSequence.isEmpty {
+                    return
+                }
+                
+                // 마지막이 숫자인지 확인
+                if let lastChar = inputSequence.last, !CalcButton.operators.contains(String(lastChar)) {
+                    // 마지막 숫자(a)의 시작 위치 찾기
+                    var numberStartIndex = inputSequence.count - 1
+                    while numberStartIndex >= 0 {
+                        let char = inputSequence[inputSequence.index(inputSequence.startIndex, offsetBy: numberStartIndex)]
+                        if CalcButton.operators.contains(String(char)) {
+                            break
+                        }
+                        numberStartIndex -= 1
+                    }
+                    
+                    // a와 b 분리
+                    let a = inputSequence[inputSequence.index(inputSequence.startIndex, offsetBy: numberStartIndex + 1)...]
+                    let b = numberStartIndex >= 0 ? String(inputSequence[..<inputSequence.index(inputSequence.startIndex, offsetBy: numberStartIndex + 1)]) : ""
+                    
+                    // b 변환
+                    let newB: String
+                    if b.isEmpty {
+                        newB = "-"
+                    } else {
+                        // 마지막 연산자 찾기
+                        let lastOperator = b.last!
+                        let lastOperatorStr = String(lastOperator)
+                        
+                        // ×- 또는 ÷- 처리
+                        if lastOperatorStr == "-" && b.count >= 2 {
+                            let secondLastChar = b[b.index(b.endIndex, offsetBy: -2)]
+                            if String(secondLastChar) == "×" || String(secondLastChar) == "÷" {
+                                newB = String(b.dropLast(2)) + String(secondLastChar)
+                                inputSequence = newB + a
+                                return
+                            }
+                        }
+                        
+                        // 일반 연산자 변환
+                        if let button = CalcButton.getOperatorButton(for: lastOperatorStr) {
+                            // b가 맨 앞에 있는 경우(인덱스 0을 포함)
+                            if numberStartIndex == 0 {
+                                // -를 삭제
+                                newB = ""
+                            } else {
+                                newB = String(b.dropLast()) + button.toggledOperator
+                            }
+                        } else {
+                            newB = b
+                        }
+                    }
+                    
+                    // 새로운 문자열 조합
+                    inputSequence = newB + a
+                }
+            case .backspace:
+                // inputSequence가 비어있지 않은 경우에만 동작
+                guard !inputSequence.isEmpty else { return }
+                inputSequence.removeLast()
             }
         }
     }
@@ -207,11 +354,36 @@ struct ContentView: View {
     }
     
     func calculateResult() {
-        // 입력이 비어있으면 계산하지 않음
         guard !inputSequence.isEmpty else { return }
         
-        // ×를 *로, ÷를 /로 변환
+        // 마지막 연산자 제거
+        while let lastChar = inputSequence.last, ["+", "-", "×", "÷"].contains(String(lastChar)) {
+            inputSequence.removeLast()
+        }
+        
+        // ×- 또는 ÷-로 끝나는 경우 처리
+        if inputSequence.hasSuffix("×-") || inputSequence.hasSuffix("÷-") {
+            inputSequence.removeLast(2)
+        }
+        
+        // 모든 숫자를 Double로 변환
         var expression = inputSequence
+        let numberPattern = "\\d+(\\.\\d+)?"
+        if let regex = try? NSRegularExpression(pattern: numberPattern) {
+            let matches = regex.matches(in: expression, range: NSRange(expression.startIndex..., in: expression))
+            for match in matches.reversed() {
+                if let range = Range(match.range, in: expression) {
+                    let number = expression[range]
+                    if let doubleValue = Double(number) {
+                        // 정확한 Double 값 유지
+                        expression = expression.replacingCharacters(in: range, with: String(doubleValue))
+                    }
+                }
+            }
+        }
+        
+        // ×를 *로, ÷를 /로 변환
+        expression = expression
             .replacingOccurrences(of: "×", with: "*")
             .replacingOccurrences(of: "÷", with: "/")
         
@@ -240,8 +412,8 @@ struct ContentView: View {
         if number.truncatingRemainder(dividingBy: 1) == 0 {
             return String(Int(number))
         }
-        // 소수점이 있는 경우 소수점 둘째 자리까지 표시
-        return String(format: "%.2f", number)
+        // 소수점이 있는 경우 정확한 값 표시
+        return String(number)
     }
     
     func buttonWidth(item: CalcButton) -> CGFloat {
