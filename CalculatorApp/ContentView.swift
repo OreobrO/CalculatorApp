@@ -63,6 +63,7 @@ struct ContentView: View {
     @State var value = ""
     @State var plusMinus = ""
     @State var multiplyDivide = ""
+    @State var errorMessage: String? = nil
     
     let buttons: [[CalcButton]] = [
         [.clear, .negative, .percent, .divide],
@@ -91,9 +92,15 @@ struct ContentView: View {
                             .opacity(0.3)
                         Spacer()
                         VStack {
-                            Text((Double(view) ?? 0.0).truncatingRemainder(dividingBy: 1.0) == 0 ? String(Int(Double(view) ?? 0.0)) : view)
-                                .font(.system(size: 48, weight: .light))
-                                .foregroundColor(.black)
+                            if let error = errorMessage {
+                                Text(error)
+                                    .font(.system(size: 24, weight: .light))
+                                    .foregroundColor(.red)
+                            } else {
+                                Text((Double(view) ?? 0.0).truncatingRemainder(dividingBy: 1.0) == 0 ? String(Int(Double(view) ?? 0.0)) : view)
+                                    .font(.system(size: 48, weight: .light))
+                                    .foregroundColor(.black)
+                            }
                         }
                     }//HStack
                     .frame(height: 100)
@@ -107,7 +114,7 @@ struct ContentView: View {
                             Button(action: {
                                 self.didTap(button: item)
                             }, label: {
-                                if [.add, .subtract, .divide, .multiply, .equal, .percent, .negative].contains(item) {
+                                if [.add, .subtract, .multiply, .divide, .equal, .percent, .negative].contains(item) {
                                     Image(systemName: item.rawValue)
                                         .font(.system(size: 24))
                                         .frame(
@@ -139,47 +146,61 @@ struct ContentView: View {
     }
     
     func didTap(button: CalcButton) {
+        if errorMessage != nil && button != .clear {
+            return
+        }
+        
         switch button {
         case .add, .subtract, .multiply, .divide, .equal:
             if button == .add {
                 self.isCalculationStarted = true
                 self.value = String(Double(self.view)!)
-                self.view = String(evaluateExpression(plusMinus + multiplyDivide + value)!)
-                self.value = String(Double(self.view)!)
-                self.plusMinus += self.value + "+"
-                self.multiplyDivide = ""
-                self.value = ""
+                if let result = evaluateExpression(plusMinus + multiplyDivide + value) {
+                    self.view = String(result)
+                    self.value = String(result)
+                    self.plusMinus += self.value + "+"
+                    self.multiplyDivide = ""
+                    self.value = ""
+                }
             }
             else if button == .subtract {
                 self.isCalculationStarted = true
                 self.value = String(Double(self.view)!)
-                self.view = String(evaluateExpression(plusMinus + multiplyDivide + value)!)
-                self.value = String(Double(self.view)!)
-                self.plusMinus += self.value + "-"
-                self.multiplyDivide = ""
-                self.value = ""
+                if let result = evaluateExpression(plusMinus + multiplyDivide + value) {
+                    self.view = String(result)
+                    self.value = String(result)
+                    self.plusMinus += self.value + "-"
+                    self.multiplyDivide = ""
+                    self.value = ""
+                }
             }
             else if button == .multiply {
                 self.isCalculationStarted = true
                 self.value = String(Double(self.view)!)
-                self.view = String(evaluateExpression(multiplyDivide + value)!)
-                self.multiplyDivide += self.value + "*"
-                self.value = ""
+                if let result = evaluateExpression(multiplyDivide + value) {
+                    self.view = String(result)
+                    self.multiplyDivide += self.value + "*"
+                    self.value = ""
+                }
             }
             else if button == .divide {
                 self.isCalculationStarted = true
                 self.value = String(Double(self.view)!)
-                self.view = String(evaluateExpression(multiplyDivide + value)!)
-                self.multiplyDivide += self.value + "/"
-                self.value = ""
+                if let result = evaluateExpression(multiplyDivide + value) {
+                    self.view = String(result)
+                    self.multiplyDivide += self.value + "/"
+                    self.value = ""
+                }
             }
             else if button == .equal {
                 self.isCalculationStarted = true
                 self.value = String(Double(self.view)!)
-                self.view = String(evaluateExpression(plusMinus + multiplyDivide + value)!)
-                self.plusMinus = ""
-                self.multiplyDivide = ""
-                self.value = ""
+                if let result = evaluateExpression(plusMinus + multiplyDivide + value) {
+                    self.view = String(result)
+                    self.plusMinus = ""
+                    self.multiplyDivide = ""
+                    self.value = ""
+                }
             }
         case .clear:
             self.isCalculationStarted = false
@@ -187,14 +208,19 @@ struct ContentView: View {
             self.value = ""
             self.plusMinus = ""
             self.multiplyDivide = ""
+            self.errorMessage = nil
         case .decimal:
             if !view.contains(".") {
                 self.view += "."
-            } else {
-                break
             }
-        case .negative, .percent:
-            break
+        case .negative:
+            if let value = Double(view) {
+                self.view = String(-value)
+            }
+        case .percent:
+            if let value = Double(view) {
+                self.view = String(value / 100)
+            }
         default:
             let number = button.rawValue
             if !isCalculationStarted {
@@ -207,9 +233,26 @@ struct ContentView: View {
     }
     
     func evaluateExpression(_ expression: String) -> Double? {
-        if let result = NSExpression(format: expression).expressionValue(with: nil, context: nil) as? Double {
+        if expression.contains("/0") {
+            errorMessage = "0으로 나눌 수 없습니다"
+            return nil
+        }
+        
+        if expression.isEmpty {
+            return 0
+        }
+        
+        do {
+            let result = try NSExpression(format: expression).expressionValue(with: nil, context: nil) as? Double
+            
+            if let result = result, abs(result) > Double.greatestFiniteMagnitude {
+                errorMessage = "계산 결과가 너무 큽니다"
+                return nil
+            }
+            
             return result
-        } else {
+        } catch {
+            errorMessage = "계산 오류가 발생했습니다"
             return nil
         }
     }
