@@ -168,47 +168,17 @@ struct CalculatorView: View {
                     return
                 }
                 
+                // 마지막이 .인 경우 0 추가
+                if inputSequence.hasSuffix(".") {
+                    inputSequence += "0"
+                }
+                
                 // 마지막 연산자와 그 이전 문자 확인
                 if let lastChar = inputSequence.last {
                     let lastCharStr = String(lastChar)
                     
-                    // ×- 또는 ÷-로 끝나는 경우
-                    if lastCharStr == "-" && inputSequence.count >= 2 {
-                        let secondLastChar = inputSequence[inputSequence.index(inputSequence.endIndex, offsetBy: -2)]
-                        let secondLastCharStr = String(secondLastChar)
-                        
-                        if secondLastCharStr == "×" || secondLastCharStr == "÷" {
-                            switch button {
-                            case .add:
-                                // ×- 또는 ÷-를 +로 변경
-                                inputSequence.removeLast(2)
-                                inputSequence += "+"
-                            case .subtract:
-                                // ×- 또는 ÷- 유지
-                                return
-                            case .multiply:
-                                // ×- 또는 ÷-를 ×로 변경
-                                inputSequence.removeLast(2)
-                                inputSequence += "×"
-                            case .divide:
-                                // ×- 또는 ÷-를 ÷로 변경
-                                inputSequence.removeLast(2)
-                                inputSequence += "÷"
-                            default:
-                                break
-                            }
-                            return
-                        }
-                    }
-                    
-                    // 일반적인 연산자 처리
-                    if ["+", "-", "×", "÷"].contains(lastCharStr) {
-                        // × 또는 ÷ 뒤에 -가 오는 경우
-                        if button == .subtract && (lastCharStr == "×" || lastCharStr == "÷") {
-                            inputSequence += "-"
-                            return
-                        }
-                        
+                    // ×- 또는 ÷- 또는 .-로 끝나는 경우
+                    if ["×", "÷", "."].contains(lastCharStr) {
                         // 마지막 연산자를 새로운 연산자로 교체
                         inputSequence.removeLast()
                     }
@@ -221,6 +191,10 @@ struct CalculatorView: View {
                 inputSequence = ""
                 calculationResult = nil
             case .equal:
+                // 마지막이 .인 경우 0 추가
+                if inputSequence.hasSuffix(".") {
+                    inputSequence += "0"
+                }
                 calculateResult()
                 inputSequence = ""
             case .negative:
