@@ -1,5 +1,23 @@
 import SwiftUI
 
+// MARK: - Constants
+private enum Constants {
+    enum Layout {
+        static let cardHeight: CGFloat = 104
+        static let cardCornerRadius: CGFloat = 26
+        static let imageMaxHeight: CGFloat = 200
+        static let imageCornerRadius: CGFloat = 12
+        static let spacing: CGFloat = 16
+    }
+    
+    enum Text {
+        static let navigationTitle = "여행"
+        static let addTravelTitle = "새 여행 추가"
+        static let cancelButton = "취소"
+        static let saveButton = "저장"
+    }
+}
+
 // MARK: - Models
 struct Travel: Identifiable, Hashable {
     let id = UUID()
@@ -10,33 +28,45 @@ struct Travel: Identifiable, Hashable {
     let description: String
     let budget: Double
     let currency: String
+    let backgroundColor: Color
 }
 
 // MARK: - View Models
+@MainActor
 final class TravelViewModel: ObservableObject {
-    @Published var travels: [Travel] = [
-        Travel(
-            destination: "도쿄 여행",
-            date: "23.06.03 - 23.06.07",
-            imageName: "tokyo",
-            peopleCount: 3,
-            description: "도쿄 디즈니랜드, 시부야, 하라주쿠 등 도쿄의 주요 관광지를 둘러보는 여행",
-            budget: 2000000,
-            currency: "JPY"
-        ),
-        Travel(
-            destination: "호주 여행",
-            date: "22.09.23 - 22.10.27",
-            imageName: "sydney",
-            peopleCount: 2,
-            description: "시드니 오페라하우스, 그레이트 배리어 리프, 울루루 등 호주의 자연과 문화를 경험하는 여행",
-            budget: 5000000,
-            currency: "AUD"
-        )
-    ]
+    @Published private(set) var travels: [Travel] = []
+    
+    init() {
+        loadInitialData()
+    }
     
     func addTravel(_ travel: Travel) {
         travels.append(travel)
+    }
+    
+    private func loadInitialData() {
+        travels = [
+            Travel(
+                destination: "도쿄 여행",
+                date: "23.06.03 - 23.06.07",
+                imageName: "tokyo",
+                peopleCount: 3,
+                description: "도쿄 디즈니랜드, 시부야, 하라주쿠 등 도쿄의 주요 관광지를 둘러보는 여행",
+                budget: 2000000,
+                currency: "JPY",
+                backgroundColor: Color.blue.opacity(0.1)
+            ),
+            Travel(
+                destination: "호주 여행",
+                date: "22.09.23 - 22.10.27",
+                imageName: "sydney",
+                peopleCount: 2,
+                description: "시드니 오페라하우스, 그레이트 배리어 리프, 울루루 등 호주의 자연과 문화를 경험하는 여행",
+                budget: 5000000,
+                currency: "AUD",
+                backgroundColor: Color.orange.opacity(0.1)
+            )
+        ]
     }
 }
 
@@ -44,23 +74,24 @@ final class TravelViewModel: ObservableObject {
 struct TravelHomeView: View {
     @StateObject private var viewModel = TravelViewModel()
     @State private var showingAddTravel = false
+    @State private var selectedTravel: Travel?
     
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 16) {
+                LazyVStack(spacing: Constants.Layout.spacing) {
                     ForEach(viewModel.travels) { travel in
-                        NavigationLink {
-                            TravelDetailView(travel: travel)
-                        } label: {
+                        NavigationLink(value: travel) {
                             TravelCardView(travel: travel)
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding()
             }
-            .navigationTitle("여행")
+            .navigationTitle(Constants.Text.navigationTitle)
+            .navigationDestination(for: Travel.self) { travel in
+                TravelDetailView(travel: travel)
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: { showingAddTravel = true }) {
@@ -75,6 +106,7 @@ struct TravelHomeView: View {
     }
 }
 
+// MARK: - Subviews
 struct TravelCardView: View {
     let travel: Travel
     
@@ -108,9 +140,9 @@ struct TravelCardView: View {
             }
             .padding()
         }
-        .background(Color(.systemGray6))
-        .frame(height: 104)
-        .cornerRadius(26)
+        .background(travel.backgroundColor)
+        .frame(height: Constants.Layout.cardHeight)
+        .cornerRadius(Constants.Layout.cardCornerRadius)
     }
 }
 
@@ -123,10 +155,10 @@ struct TravelDetailView: View {
                 Image(travel.imageName)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxHeight: 200)
-                    .cornerRadius(12)
+                    .frame(maxHeight: Constants.Layout.imageMaxHeight)
+                    .cornerRadius(Constants.Layout.imageCornerRadius)
                 
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: Constants.Layout.spacing) {
                     Text(travel.description)
                         .font(.body)
                     
@@ -155,6 +187,7 @@ struct TravelDetailView: View {
     }
 }
 
+// MARK: - Add Travel View
 struct AddTravelView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: TravelViewModel
@@ -175,13 +208,13 @@ struct AddTravelView: View {
                 travelInfoSection
                 detailInfoSection
             }
-            .navigationTitle("새 여행 추가")
+            .navigationTitle(Constants.Text.addTravelTitle)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("취소") { dismiss() }
+                    Button(Constants.Text.cancelButton) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("저장") { saveTravel() }
+                    Button(Constants.Text.saveButton) { saveTravel() }
                         .disabled(!isFormValid)
                 }
             }
@@ -223,7 +256,8 @@ struct AddTravelView: View {
             peopleCount: peopleCount,
             description: description,
             budget: Double(budget) ?? 0,
-            currency: currency
+            currency: currency,
+            backgroundColor: Color.blue.opacity(0.1)
         )
         viewModel.addTravel(newTravel)
         dismiss()
