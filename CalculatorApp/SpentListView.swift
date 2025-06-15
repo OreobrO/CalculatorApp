@@ -348,5 +348,6 @@ struct DatePickerView: View {
     }
 }
 
-
-
+#Preview {
+    SpentListView()
+}
